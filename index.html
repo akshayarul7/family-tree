@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family Tree</title>
+  <link rel="stylesheet" href="src/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css" />
+</head>
+<body>
+  <div id="ft-app">
+    <div id="ft-toolbar">
+      <h1><i class="ti ti-trees" aria-hidden="true"></i> Family Tree</h1>
+      <div class="ft-toolbar-actions">
+        <button class="ft-btn" onclick="resetView()">
+          <i class="ti ti-focus-2" aria-hidden="true"></i> Reset view
+        </button>
+        <button class="ft-btn accent" id="add-member-btn">
+          <i class="ti ti-plus" aria-hidden="true"></i> Add member
+        </button>
+      </div>
+    </div>
+
+    <div id="ft-canvas-wrap">
+      <svg id="ft-lines"></svg>
+      <div id="ft-canvas"></div>
+
+      <!-- Edit panel -->
+      <div id="ft-panel">
+        <button id="ft-panel-close" onclick="closePanel()">
+          <i class="ti ti-x"></i>
+        </button>
+        <div class="ft-panel-avatar" id="pp-avatar"></div>
+        <div class="ft-panel-name" id="pp-name"></div>
+        <div class="ft-panel-rel" id="pp-rel"></div>
+        <div class="ft-panel-divider"></div>
+        <div class="ft-field">
+          <label>Full name</label>
+          <input type="text" id="pp-name-input" placeholder="Enter name" />
+        </div>
+        <div class="ft-field">
+          <label>Birth year</label>
+          <input type="text" id="pp-year-input" placeholder="e.g. 1965" />
+        </div>
+        <div class="ft-field">
+          <label>Notes</label>
+          <input type="text" id="pp-notes-input" placeholder="Any extra info" />
+        </div>
+        <label class="ft-upload-btn">
+          <i class="ti ti-camera" aria-hidden="true"></i> Upload photo
+          <input type="file" accept="image/*" id="pp-photo-input" style="display:none" />
+        </label>
+        <button class="ft-save-btn" onclick="savePerson()">Save changes</button>
+      </div>
+
+      <!-- Zoom controls -->
+      <div id="ft-zoom">
+        <button class="ft-zoom-btn" onclick="zoom(1.15)" title="Zoom in">
+          <i class="ti ti-plus"></i>
+        </button>
+        <button class="ft-zoom-btn" onclick="zoom(0.87)" title="Zoom out">
+          <i class="ti ti-minus"></i>
+        </button>
+      </div>
+
+      <!-- Legend -->
+      <div id="ft-legend">
+        <div class="ft-legend-item">
+          <div class="ft-legend-dot you-dot"></div> You
+        </div>
+        <div class="ft-legend-item">
+          <div class="ft-legend-dot parent-dot"></div> Parents' generation
+        </div>
+        <div class="ft-legend-item">
+          <div class="ft-legend-dot grand-dot"></div> Grandparents
+        </div>
+        <div class="ft-legend-item">
+          <div class="ft-legend-dot line-solid"></div> Parent–child
+        </div>
+        <div class="ft-legend-item">
+          <div class="ft-legend-dot line-dashed"></div> Couple
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/data.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
