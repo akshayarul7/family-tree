@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import PersonNode from './PersonNode'
 import EdgeLines  from './EdgeLines'
 
@@ -47,29 +47,65 @@ export default function TreeCanvas({ people, relationships, selectedId, onSelect
     setScale(s => Math.min(Math.max(s * factor, 0.2), 2.8))
   }, [])
 
-  const resetView = useCallback(() => { setScale(1); setPan({ x:0, y:0 }) }, [])
+  // UPDATED: Dynamically calculates the center of the viewport relative to the tree bounds
+  const resetView = useCallback(() => { 
+    if (!wrapRef.current) return;
+    
+    const viewportW = wrapRef.current.clientWidth;
+    const viewportH = wrapRef.current.clientHeight;
+    
+    setScale(1);
+    setPan({ 
+      x: (viewportW - width) / 2, 
+      y: (viewportH - height) / 2 
+    });
+  }, [width, height]);
 
-  // expose resetView to parent via a hidden button (avoids prop drilling)
-  // parent can call document.getElementById('tree-reset-btn')?.click()
+  // NEW: Automatically centers the canvas perfectly on initial component mount
+  useEffect(() => {
+    resetView();
+  }, [resetView]);
 
   function onMouseDown(e) {
     if (e.target.closest('.ft-node') || e.target.closest('.ft-panel')) return
     panRef.current = { active:true, startX:e.clientX, startY:e.clientY, startPanX:pan.x, startPanY:pan.y }
     wrapRef.current?.classList.add('grabbing')
   }
+  
   function onMouseMove(e) {
     if (!panRef.current.active) return
     const { startX, startY, startPanX, startPanY } = panRef.current
     setPan({ x: startPanX + (e.clientX - startX)/scale, y: startPanY + (e.clientY - startY)/scale })
   }
+  
   function onMouseUp() {
     panRef.current.active = false
     wrapRef.current?.classList.remove('grabbing')
   }
+
   function onWheel(e) {
-    e.preventDefault()
-    applyZoom(e.deltaY < 0 ? 1.08 : 0.93)
+    e.preventDefault();
+    
+    // 1. Get the mouse position relative to the canvas wrapper
+    const rect = wrapRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // 2. Determine zoom factor (clamped for sensitivity)
+    const zoomFactor = 1 - (e.deltaY * 0.001);
+    const nextScale = Math.min(Math.max(scale * zoomFactor, 0.2), 2.8);
+    const actualScaleChange = nextScale / scale;
+
+    // 3. Calculate how the pan must shift to keep the mouse point stationary
+    // Formula: newPan = (mousePos - currentPan) * (1 - scaleChange) / currentScale
+    setPan(prev => ({
+      x: prev.x - (mouseX / scale) * (actualScaleChange - 1),
+      y: prev.y - (mouseY / scale) * (actualScaleChange - 1)
+    }));
+
+    setScale(nextScale);
   }
+
   function onBgClick(e) {
     if (!e.target.closest('.ft-node')) onDeselect()
   }
@@ -97,13 +133,11 @@ export default function TreeCanvas({ people, relationships, selectedId, onSelect
         </div>
       </div>
 
-      {/* Zoom controls */}
       <div id="ft-zoom">
         <button className="ft-zoom-btn" onClick={() => applyZoom(1.15)} title="Zoom in"><i className="ti ti-plus"></i></button>
         <button className="ft-zoom-btn" onClick={() => applyZoom(0.87)} title="Zoom out"><i className="ti ti-minus"></i></button>
       </div>
 
-      {/* Legend */}
       <div id="ft-legend">
         <div className="ft-legend-item"><div className="ft-legend-dot you-dot"></div>You</div>
         <div className="ft-legend-item"><div className="ft-legend-dot parent-dot"></div>Parents' generation</div>
@@ -112,7 +146,6 @@ export default function TreeCanvas({ people, relationships, selectedId, onSelect
         <div className="ft-legend-item"><div className="ft-legend-dot" style={{width:18,height:0,borderRadius:0,borderTop:'1.5px dashed #C9A84C'}}></div>Couple</div>
       </div>
 
-      {/* Hidden reset button — triggered by toolbar */}
       <button id="tree-reset-btn" style={{display:'none'}} onClick={resetView}></button>
     </div>
   )
