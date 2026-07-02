@@ -3,8 +3,7 @@ import { uploadPhoto } from '../lib/uploadPhoto'
 
 const AVATAR_CLASS = { you:'avatar-you', parent:'avatar-parent', grand:'avatar-grand', other:'avatar-other' }
 
-// 1. Added allPeople and onAddRelationship to props
-export default function EditPanel({ person, userId, allPeople, onClose, onSave, onDelete, onAddRelationship }) {
+export default function EditPanel({ person, userId, allPeople, onClose, onSave, onDelete, onAddRelationship, onAddPerson }) {
   const [name,     setName]     = useState('')
   const [year,     setYear]     = useState('')
   const [notes,    setNotes]    = useState('')
@@ -13,9 +12,14 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
   const [uploadErr,setUploadErr]= useState(null)
   const fileRef = useRef(null)
 
-  // 2. Added state for the connection feature
+  // Link existing person state
   const [linkTargetId, setLinkTargetId] = useState('')
   const [linkType,     setLinkType]     = useState('parent_child')
+
+  // Quick Add new person state
+  const [quickName, setQuickName] = useState('')
+  const [quickRole, setQuickRole] = useState('child')
+  const [isQuickAdding, setIsQuickAdding] = useState(false)
 
   useEffect(() => {
     if (!person) return
@@ -24,9 +28,11 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
     setNotes(person.notes     || '')
     setUploadErr(null)
     
-    // Reset connection dropdowns when a new person is selected
+    // Reset connection / quick add dropdowns when a new person is selected
     setLinkTargetId('')
     setLinkType('parent_child')
+    setQuickName('')
+    setQuickRole('child')
   }, [person?.id]) // eslint-disable-line
 
   if (!person) return null
@@ -55,6 +61,72 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
 
     setUploading(false)
     e.target.value = ''
+  }
+
+  async function handleQuickAdd(e) {
+    e.preventDefault();
+    if (!quickName.trim()) return;
+
+    setIsQuickAdding(true);
+    
+    try {
+      let newGen = person.gen || 0;
+      let relType = 'parent_child';
+      let personA = person.id; // Default assumption: selected is parent
+      let personB = null;      // Default assumption: new node is child
+
+      if (quickRole === 'child') {
+        newGen = (person.gen || 0) - 1;
+        personA = person.id;
+      } else if (quickRole === 'parent') {
+        newGen = (person.gen || 0) + 1;
+        personB = person.id; 
+      } else if (quickRole === 'partner') {
+        newGen = (person.gen || 0);
+        relType = 'couple';
+        personA = person.id;
+      }
+
+      // Create new person
+      const createdPerson = await onAddPerson({
+        name: quickName.trim(),
+        gen: newGen,
+        col: person.col || 0 // Inherit column to render nearby initially
+      });
+
+      if (!createdPerson || !createdPerson.id) {
+        throw new Error("Failed to retrieve new person ID");
+      }
+
+      // Assign the new ID to the correct directional relationship slot
+      if (quickRole === 'child' || quickRole === 'partner') {
+        personB = createdPerson.id;
+      } else if (quickRole === 'parent') {
+        personA = createdPerson.id;
+      }
+
+      // Create relationship
+      await onAddRelationship(personA, personB, relType);
+
+      // Reset Form
+      setQuickName('');
+      setQuickRole('child');
+
+    } catch (error) {
+      console.error("Error adding relative:", error);
+      alert("Failed to quick-add relative. Check console for details.");
+    } finally {
+      setIsQuickAdding(false);
+    }
+  }
+
+  const dropdownStyle = {
+    padding: '7px 10px', 
+    borderRadius: '8px', 
+    border: '1px solid var(--border-mid)', 
+    background: 'var(--cream)',
+    fontFamily: 'inherit',
+    fontSize: '13px'
   }
 
   return (
@@ -95,27 +167,56 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
         {saving ? 'Saving…' : 'Save changes'}
       </button>
 
-      {/* 3. New Add Connection Section */}
+      <div className="ft-panel-divider" />
+
+      {/* NEW: Quick Add Relative */}
+      <div className="ft-field">
+        <label>Quick Add New Relative</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <input 
+            type="text" 
+            value={quickName} 
+            onChange={e => setQuickName(e.target.value)}
+            placeholder="New person's name"
+            style={dropdownStyle}
+          />
+          <select 
+            value={quickRole} 
+            onChange={e => setQuickRole(e.target.value)}
+            style={dropdownStyle}
+          >
+            <option value="child">As Child</option>
+            <option value="parent">As Parent</option>
+            <option value="partner">As Partner</option>
+          </select>
+          <button 
+            className="ft-save-btn"
+            style={{ 
+              background: 'var(--gold)', 
+              color: 'var(--green)', 
+              opacity: quickName.trim() ? 1 : 0.5,
+              cursor: quickName.trim() ? 'pointer' : 'not-allowed'
+            }}
+            disabled={isQuickAdding || !quickName.trim()}
+            onClick={handleQuickAdd}
+          >
+            {isQuickAdding ? 'Adding...' : 'Add & Connect'}
+          </button>
+        </div>
+      </div>
+
       <div className="ft-panel-divider" />
       
+      {/* EXISTING: Link Existing Relative */}
       <div className="ft-field">
-        <label>Add Connection</label>
+        <label>Link Existing Relative</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          
           <select 
             value={linkTargetId} 
             onChange={e => setLinkTargetId(e.target.value)}
-            style={{ 
-              padding: '7px 10px', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border-mid)', 
-              background: 'var(--cream)',
-              fontFamily: 'inherit',
-              fontSize: '13px'
-            }}
+            style={dropdownStyle}
           >
             <option value="">Select someone...</option>
-            {/* Filter out the current person so they can't connect to themselves */}
             {allPeople && allPeople
               .filter(p => p.id !== person.id)
               .map(p => (
@@ -126,14 +227,7 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
           <select 
             value={linkType} 
             onChange={e => setLinkType(e.target.value)}
-            style={{ 
-              padding: '7px 10px', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border-mid)', 
-              background: 'var(--cream)',
-              fontFamily: 'inherit',
-              fontSize: '13px'
-            }}
+            style={dropdownStyle}
           >
             <option value="parent_child">Parent / Child</option>
             <option value="couple">Couple</option>
@@ -151,7 +245,7 @@ export default function EditPanel({ person, userId, allPeople, onClose, onSave, 
             onClick={() => {
               if (linkTargetId) {
                 onAddRelationship(person.id, linkTargetId, linkType)
-                setLinkTargetId('') // Reset dropdown after successful connection
+                setLinkTargetId('') 
               }
             }}
           >
